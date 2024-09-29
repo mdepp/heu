@@ -45,4 +45,4 @@ whitespace = "<any unicode whitespace>" ;
 
 so a line containing `0 #FF0000; 1 #00FF00` would send commands to turn channel 0 red and channel 1 green.
 A line containing `#0000FF` would send commands to turn all channels blue.
-See [commands.txt.example](commands.txt.example) for a an example command file.
+See [commands.txt.example](commands.txt.example) for an example command file.

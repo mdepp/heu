@@ -6,7 +6,7 @@ You provide channel and colour information, and it handles the details.
 ## Configuration
 
 Configuration can be read either using environmnent variables or via a configuration file located within the user's configuration directory (for linux this will usually be `~/.config/heu/heu.toml`) or within the same directory as the heu executable.
-For a list of configuration keys, see [.env.example] and [heu.toml.example].
+For a list of configuration keys, see [.env.example](.env.example) and [heu.toml.example](heu.toml.example).
 To populate the configuration, follow the setup process within the [hue entertainment documentation](https://developers.meethue.com/develop/hue-entertainment/hue-entertainment-api/).
 
 ## Usage
@@ -45,4 +45,4 @@ whitespace = "<any unicode whitespace>" ;
 
 so a line containing `0 #FF0000; 1 #00FF00` would send commands to turn channel 0 red and channel 1 green.
 A line containing `#0000FF` would send commands to turn all channels blue.
-See [commands.txt.example] for a an example command file.
+See [commands.txt.example](commands.txt.example) for a an example command file.

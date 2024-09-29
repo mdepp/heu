@@ -36,7 +36,7 @@ type chanMessage struct {
 func parseCommands(text string) ([]command, error) {
 	var commands []command
 	for _, commandText := range strings.Split(text, ";") {
-		commandTextChunks := strings.Split(commandText, " ")
+		commandTextChunks := strings.Split(strings.TrimSpace(commandText), " ")
 		if len(commandTextChunks) == 1 {
 			color, err := colorful.Hex(commandTextChunks[0])
 			if err != nil {
@@ -78,8 +78,10 @@ func getEntertainmentConfig(client *clients.HueClipAPIClient, id string) (*clien
 }
 
 var (
-	cmdFilePath string
-	frequency   int
+	cmdFilePath     string
+	streamFrequency int
+	inputFrequency  int
+	loopCommands    bool
 )
 
 var streamCmd = &cobra.Command{
@@ -100,8 +102,10 @@ from standard input to the session.`,
 func init() {
 	rootCmd.AddCommand(streamCmd)
 
-	streamCmd.PersistentFlags().StringVar(&cmdFilePath, "file", "", "file from which to read commands (defaults to standard input)")
-	streamCmd.PersistentFlags().IntVar(&frequency, "frequency", 60, "frequency in hz at which to send entertainment API messages over UDP")
+	streamCmd.PersistentFlags().StringVarP(&cmdFilePath, "file", "f", "", "file from which to read commands (defaults to standard input)")
+	streamCmd.PersistentFlags().IntVarP(&streamFrequency, "stream-frequency", "F", 60, "frequency in hz at which to send entertainment API messages over UDP")
+	streamCmd.PersistentFlags().IntVarP(&inputFrequency, "input-frequency", "k", 0, "frequency in hz at which to read from input file (set to 0 for no delay)")
+	streamCmd.PersistentFlags().BoolVarP(&loopCommands, "loop", "l", false, "play commands in a loop")
 }
 
 func runStreamCmd(entertainmentConfigId string) error {
@@ -161,30 +165,44 @@ func runStreamCmd(entertainmentConfigId string) error {
 
 	commandChan := make(chan chanMessage)
 
+	var inputTicker *time.Ticker
+	if inputFrequency > 0 {
+		inputTicker = time.NewTicker(time.Second / time.Duration(inputFrequency))
+	}
+
 	go func() {
 		reader := bufio.NewReader(cmdFile)
 		for {
 			line, err := reader.ReadString('\n')
-			if err == io.EOF {
-				break
+			if err == io.EOF && !loopCommands {
+				return
+			} else if err == io.EOF && loopCommands {
+				if _, err = cmdFile.Seek(0, io.SeekStart); err != nil {
+					commandChan <- chanMessage{err: err}
+					return
+				}
+				reader.Reset(cmdFile)
 			} else if err != nil {
 				commandChan <- chanMessage{err: err}
 				return
+			} else {
+				commands, err := parseCommands(line)
+				if err != nil {
+					commandChan <- chanMessage{err: err}
+					return
+				}
+				commandChan <- chanMessage{commands: commands}
+				if inputTicker != nil {
+					<-inputTicker.C
+				}
 			}
-			commands, err := parseCommands(line)
-			if err != nil {
-				commandChan <- chanMessage{err: err}
-				return
-			}
-			commandChan <- chanMessage{commands: commands}
-
 		}
 		slog.Info("Exiting cleanly...")
 		commandChan <- chanMessage{}
 	}()
 
-	ticker := time.NewTicker(time.Second / time.Duration(frequency))
-	defer ticker.Stop()
+	streamTicker := time.NewTicker(time.Second / time.Duration(streamFrequency))
+	defer streamTicker.Stop()
 
 	builder := message.NewBuilder(message.COLOR_SPACE_RGB).WritePreamble([]byte(entertainmentConfig.ID))
 	message := builder.Build()
@@ -194,7 +212,7 @@ func runStreamCmd(entertainmentConfigId string) error {
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-streamTicker.C:
 			_, err = entertainmentClient.Write(message)
 			if err != nil {
 				return err

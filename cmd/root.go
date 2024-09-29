@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -51,8 +52,11 @@ func initConfig() {
 		userConfigDir, err := os.UserConfigDir()
 		cobra.CheckErr(err)
 
+		executablePath, err := os.Executable()
+		cobra.CheckErr(err)
+
 		viper.AddConfigPath(path.Join(userConfigDir, "heu"))
-		viper.AddConfigPath(".")
+		viper.AddConfigPath(filepath.Dir(executablePath))
 		viper.SetConfigType("toml")
 		viper.SetConfigName("heu")
 	}
